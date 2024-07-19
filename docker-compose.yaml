@@ -1,0 +1,54 @@
+services:
+
+  db:
+    image: mysql:5.7
+    # For debug purposes I rerun the entrypoint script to create the tables
+    command: >
+      sh -c "
+        /usr/local/bin/docker-entrypoint.sh mysqld &
+        echo 'Initializing database...' &&
+        sleep 10 &&
+        mysql -u root -p'12345678' mysql < /docker-entrypoint-initdb.d/create_tables.sql &&
+        wait
+      "
+    restart: always
+    container_name: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: '12345678'
+      MYSQL_DATABASE: 'mysql'
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./mysql/conf.d:/etc/mysql/conf.d
+      - ./mysql/logs:/logs
+      - ./mysql/data:/var/lib/mysql
+      - ./mysql/create_tables.sql:/docker-entrypoint-initdb.d/create_tables.sql
+    networks:
+      - backend
+
+  go:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: go
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+    environment:
+      DB_USER: root
+      DB_PW: 12345678
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_NAME: chat_app
+      HTTP_SERVERPORT: ':8080'
+    networks:
+      - backend
+
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  db_data:
+    driver: local
